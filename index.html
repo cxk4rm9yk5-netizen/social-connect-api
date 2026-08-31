@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Connect</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #fff; margin: 0; padding: 15px; }
+    .profile { background: #222; border-radius: 10px; padding: 15px; text-align: center; margin-bottom: 20px; }
+    .profile img { width: 100%; max-width: 300px; border-radius: 10px; }
+    .chat-box { background: #1a1a1a; padding: 10px; border-radius: 8px; height: 150px; overflow-y: auto; margin-bottom: 10px; }
+    .input-group { display: flex; gap: 5px; }
+    input { flex: 1; padding: 10px; border-radius: 5px; border: none; }
+    button { padding: 10px 15px; background: #ff0055; color: white; border: none; border-radius: 5px; font-weight: bold; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
+    .modal-content { background: #222; padding: 25px; border-radius: 10px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <div class="profile">
+    <img src="https://via.placeholder.com/300x300" alt="Profile Photo">
+    <h2>Sarah, 24</h2>
+    <div class="chat-box" id="chat"></div>
+    <div class="input-group">
+      <input type="text" id="messageInput" placeholder="Type a message...">
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <div class="modal" id="paywallModal">
+    <div class="modal-content">
+      <h2>Chat Locked 🔒</h2>
+      <p>You have used your 2 free messages. Purchase credits to continue chatting!</p>
+      <button onclick="alert('Redirecting to payment...')">Buy Credits ($9.99)</button>
+    </div>
+  </div>
+
+  <script>
+    const BACKEND_URL = "https://your-backend-url.vercel.app"; // Replace with your actual Vercel backend URL
+
+    async function sendMessage() {
+      const input = document.getElementById("messageInput");
+      const chat = document.getElementById("chat");
+      if (!input.value) return;
+
+      const userText = input.value;
+      chat.innerHTML += `<p><b>You:</b> ${userText}</p>`;
+      input.value = "";
+
+      const res = await fetch(`${BACKEND_URL}/api/chat/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: "user_101", profileId: "profile_202", text: userText })
+      });
+
+      if (res.status === 402) {
+        document.getElementById("paywallModal").style.display = "flex";
+      }
+    }
+  </script>
+</body>
+</html>
