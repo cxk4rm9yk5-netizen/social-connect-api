@@ -1,0 +1,55 @@
+const express = require('express');
+const cors = require('cors');
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// Simulated Data
+const users = { "user_101": { id: "user_101", credits: 0 } };
+const messageCounts = { "user_101_profile_202": 0 };
+
+// Paywall Middleware
+function enforcePaywall(req, res, next) {
+  const { userId, profileId } = req.body;
+  const conversationKey = `${userId}_${profileId}`;
+  
+  const currentCount = messageCounts[conversationKey] || 0;
+  const user = users[userId];
+
+  if (currentCount >= 2 && (!user || user.credits < 1)) {
+    return res.status(402).json({
+      error: "PAYWALL_LOCKED",
+      message: "Free message limit reached. Please purchase credits to continue."
+    });
+  }
+  next();
+}
+
+// Routes
+app.get('/', (req, res) => res.send('Chat Operator Backend is live on Vercel!'));
+
+app.post('/api/chat/send', enforcePaywall, (req, res) => {
+  const { userId, profileId, text } = req.body;
+  const conversationKey = `${userId}_${profileId}`;
+  messageCounts[conversationKey] = (messageCounts[conversationKey] || 0) + 1;
+
+  res.json({
+    status: "success",
+    deliveredText: text,
+    messagesSent: messageCounts[conversationKey]
+  });
+});
+
+app.post('/api/admin/reply', (req, res) => {
+  const { adminId, targetUserId, asProfileId, text } = req.body;
+  res.json({
+    status: "replied",
+    displayedSender: asProfileId,
+    recipient: targetUserId,
+    message: text
+  });
+});
+
+// Export the Express app for Vercel
+module.exports = app;
