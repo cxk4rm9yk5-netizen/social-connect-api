@@ -1,80 +1,52 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Social Connect</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0d0d0d; color: #fff; margin: 0; padding: 20px; }
-    .card { background: #1a1a1a; border-radius: 16px; padding: 16px; max-width: 400px; margin: 0 auto; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-    .profile-img { width: 100%; height: 320px; object-fit: cover; border-radius: 12px; }
-    .bio { margin: 12px 0; }
-    .chat-box { background: #111; padding: 12px; border-radius: 10px; height: 180px; overflow-y: auto; margin: 15px 0; border: 1px solid #222; }
-    .chat-box p { margin: 6px 0; font-size: 14px; }
-    .input-group { display: flex; gap: 8px; }
-    input { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #222; color: white; font-size: 14px; }
-    button { padding: 12px 18px; background: #ff2a5f; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
-    .modal-content { background: #222; padding: 24px; border-radius: 16px; text-align: center; max-width: 300px; }
-    .modal-content button { width: 100%; margin-top: 15px; }
-  </style>
-</head>
-<body>
+const express = require('express');
+const cors = require('cors');
+const app = express();
 
-  <div class="card">
-    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500" class="profile-img" alt="Profile">
-    <div class="bio">
-      <h2>Sarah, 24 <span style="color:#00ff88; font-size: 14px;">● Online</span></h2>
-      <p style="color: #aaa; font-size: 13px;">Looking for fun conversations tonight!</p>
-    </div>
+app.use(cors());
+app.use(express.json());
 
-    <div class="chat-box" id="chat">
-      <p style="color: #ff2a5f;"><b>Sarah:</b> Hey there! Glad you stopped by 👋</p>
-    </div>
+// Simulated Data
+const users = { "user_101": { id: "user_101", credits: 0 } };
+const messageCounts = { "user_101_profile_202": 0 };
 
-    <div class="input-group">
-      <input type="text" id="messageInput" placeholder="Type a reply...">
-      <button onclick="sendMessage()">Send</button>
-    </div>
-  </div>
+// Paywall Middleware
+function enforcePaywall(req, res, next) {
+  const { userId, profileId } = req.body;
+  const conversationKey = `${userId}_${profileId}`;
+  
+  const currentCount = messageCounts[conversationKey] || 0;
+  const user = users[userId];
 
-  <!-- Paywall Modal -->
-  <div class="modal" id="paywallModal">
-    <div class="modal-content">
-      <h2>Chat Locked 🔒</h2>
-      <p style="color: #ccc; font-size: 14px;">You've used your 2 free trial messages! Purchase chat credits to keep messaging Sarah.</p>
-      <button onclick="alert('Redirecting to payment gateway...')">Buy Credits ($9.99)</button>
-    </div>
-  </div>
+  if (currentCount >= 2 && (!user || user.credits < 1)) {
+    return res.status(402).json({
+      error: "PAYWALL_LOCKED",
+      message: "Free message limit reached. Please purchase credits to continue."
+    });
+  }
+  next();
+}
 
-  <script>
-    // Your actual live Vercel backend URL:
-    const BACKEND_URL = "https://social-connect-api-8zrp.vercel.app";
+// Ensure routes start with /api
+app.post('/api/chat/send', enforcePaywall, (req, res) => {
+  const { userId, profileId, text } = req.body;
+  const conversationKey = `${userId}_${profileId}`;
+  messageCounts[conversationKey] = (messageCounts[conversationKey] || 0) + 1;
 
-    async function sendMessage() {
-      const input = document.getElementById("messageInput");
-      const chat = document.getElementById("chat");
-      if (!input.value.trim()) return;
+  res.json({
+    status: "success",
+    deliveredText: text,
+    messagesSent: messageCounts[conversationKey]
+  });
+});
 
-      const userText = input.value;
-      chat.innerHTML += `<p><b>You:</b> ${userText}</p>`;
-      chat.scrollTop = chat.scrollHeight;
-      input.value = "";
+app.post('/api/admin/reply', (req, res) => {
+  const { adminId, targetUserId, asProfileId, text } = req.body;
+  res.json({
+    status: "replied",
+    displayedSender: asProfileId,
+    recipient: targetUserId,
+    message: text
+  });
+});
 
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/chat/send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: "user_101", profileId: "profile_202", text: userText })
-        });
-
-        if (res.status === 402) {
-          document.getElementById("paywallModal").style.display = "flex";
-        }
-      } catch (err) {
-        console.error("API connection failed:", err);
-      }
-    }
-  </script>
-</body>
-</html>
+module.exports = app;
